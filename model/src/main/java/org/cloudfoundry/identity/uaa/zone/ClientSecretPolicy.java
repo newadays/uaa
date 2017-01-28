@@ -1,3 +1,7 @@
+package org.cloudfoundry.identity.uaa.zone;
+
+import org.cloudfoundry.identity.uaa.authentication.GenericPasswordPolicy;
+
 /**
  * ****************************************************************************
  * Cloud Foundry
@@ -12,20 +16,14 @@
  * subcomponent's license, as noted in the LICENSE file.
  * *****************************************************************************
  */
-package org.cloudfoundry.identity.uaa.provider;
+public class ClientSecretPolicy extends GenericPasswordPolicy {
+    public static final String CLIENT_SECRET_POLICY_FIELD = "clientSecretPolicy";
 
-
-import org.cloudfoundry.identity.uaa.authentication.GenericPasswordPolicy;
-
-public class PasswordPolicy extends GenericPasswordPolicy {
-
-    public static final String PASSWORD_POLICY_FIELD = "passwordPolicy";
-
-    public PasswordPolicy() {
+    public ClientSecretPolicy() {
         super();
     }
 
-    public PasswordPolicy(int minLength,
+    public ClientSecretPolicy(int minLength,
                           int maxLength,
                           int requireUpperCaseCharacter,
                           int requireLowerCaseCharacter,
@@ -40,6 +38,4 @@ public class PasswordPolicy extends GenericPasswordPolicy {
                 requireSpecialCharacter,
                 expirePasswordsInMonths);
     }
-
-
 }
