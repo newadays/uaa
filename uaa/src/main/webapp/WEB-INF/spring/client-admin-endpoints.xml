@@ -62,6 +62,7 @@
         <property name="clientDetailsResourceMonitor" ref="jdbcClientDetailsService"/>
         <property name="approvalStore" ref="approvalStore"/>
         <property name="authenticationManager" ref="clientAuthenticationManager"/>
+        <property name="clientSecretValidator" ref="zoneClientSecretPolicyValidator"/>
         <property name="attributeNameMapper">
             <bean class="org.cloudfoundry.identity.uaa.resources.SimpleAttributeNameMapper">
                 <constructor-arg name="paramsMap">
@@ -87,6 +88,31 @@
                 </constructor-arg>
             </bean>
         </property>
+    </bean>
+
+    <bean id="globalClientSecretPolicy" class="org.cloudfoundry.identity.uaa.zone.ClientSecretPolicy">
+        <constructor-arg name="minLength" value="${client.secret.policy.global.minLength:0}"/>
+        <constructor-arg name="maxLength"  value="${client.secret.policy.global.maxLength:255}"/>
+        <constructor-arg name="requireUpperCaseCharacter" value="${client.secret.policy.global.requireUpperCaseCharacter:0}"/>
+        <constructor-arg name="requireLowerCaseCharacter" value="${client.secret.policy.global.requireLowerCaseCharacter:0}"/>
+        <constructor-arg name="requireDigit" value="${client.secret.policy.global.requireDigit:0}"/>
+        <constructor-arg name="requireSpecialCharacter" value="${client.secret.policy.global.requireSpecialCharacter:0}"/>
+        <constructor-arg name="expirePasswordsInMonths" value="${client.secret.policy.global.expirePasswordInMonths:0}"/>
+    </bean>
+
+    <bean id="defaultUaaClientSecretPolicy" class="org.cloudfoundry.identity.uaa.zone.ClientSecretPolicy">
+        <constructor-arg name="minLength" value="${client.secret.policy.minLength:#{globalClientSecretPolicy.getMinLength()}}"/>
+        <constructor-arg name="maxLength" value="${client.secret.policy.maxLength:#{globalClientSecretPolicy.getMaxLength()}}"/>
+        <constructor-arg name="requireUpperCaseCharacter" value="${client.secret.policy.requireUpperCaseCharacter:#{globalClientSecretPolicy.getRequireUpperCaseCharacter()}}"/>
+        <constructor-arg name="requireLowerCaseCharacter" value="${client.secret.policy.requireLowerCaseCharacter:#{globalClientSecretPolicy.getRequireLowerCaseCharacter()}}"/>
+        <constructor-arg name="requireDigit" value="${client.secret.policy.requireDigit:#{globalClientSecretPolicy.getRequireDigit()}}"/>
+        <constructor-arg name="requireSpecialCharacter" value="${client.secret.policy.requireSpecialCharacter:#{globalClientSecretPolicy.getRequireSpecialCharacter()}}"/>
+        <constructor-arg name="expirePasswordsInMonths" value="${client.secret.policy.expirePasswordInMonths:#{globalClientSecretPolicy.getExpirePasswordInMonths()}}"/>
+    </bean>
+
+
+    <bean id="zoneClientSecretPolicyValidator" class="org.cloudfoundry.identity.uaa.zone.ZoneClientSecretPolicyValidator">
+        <constructor-arg ref="globalClientSecretPolicy"/>
     </bean>
 
     <bean id="clientMetadataAdminEndpoints" class="org.cloudfoundry.identity.uaa.client.ClientMetadataAdminEndpoints">
