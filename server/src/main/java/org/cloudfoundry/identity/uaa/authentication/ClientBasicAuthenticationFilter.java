@@ -21,12 +21,9 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.sun.jna.platform.win32.Sspi;
-import com.sun.xml.internal.bind.v2.TODO;
 import org.cloudfoundry.identity.uaa.authentication.manager.LoginPolicy;
 import org.cloudfoundry.identity.uaa.authentication.manager.LoginPolicy.Result;
 import org.cloudfoundry.identity.uaa.oauth.client.ClientConstants;
-import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -44,6 +41,7 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 public class ClientBasicAuthenticationFilter extends BasicAuthenticationFilter {
 
     protected LoginPolicy loginPolicy;
+
     protected ClientDetailsService clientDetailsService;
 
     public ClientBasicAuthenticationFilter(AuthenticationManager authenticationManager,
@@ -83,10 +81,9 @@ public class ClientBasicAuthenticationFilter extends BasicAuthenticationFilter {
                 cal.setTimeInMillis(lastModified.getTime());
                 cal.add(Calendar.MONTH, expiringPassword);
                 if (cal.getTimeInMillis() < System.currentTimeMillis()) {
-                    throw new PasswordExpiredException("Your current password has expired. Please reset your password.");
+                    throw new ClientSecretExpiredException("Your current client secret has expired. Please reset your client secret.");
                 }
             }
-
         } catch(BadCredentialsException e) {
             super.getAuthenticationEntryPoint().commence(request, response, e);
             return;
@@ -101,6 +98,14 @@ public class ClientBasicAuthenticationFilter extends BasicAuthenticationFilter {
 
     public void setLoginPolicy(LoginPolicy loginPolicy) {
         this.loginPolicy = loginPolicy;
+    }
+
+    public ClientDetailsService getClientDetailsService() {
+        return clientDetailsService;
+    }
+
+    public void setClientDetailsService(ClientDetailsService clientDetailsService) {
+        this.clientDetailsService = clientDetailsService;
     }
 
     private String[] extractAndDecodeHeader(String header, HttpServletRequest request)
