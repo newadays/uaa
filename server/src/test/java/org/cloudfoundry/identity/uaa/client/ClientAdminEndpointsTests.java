@@ -90,12 +90,12 @@ public class ClientAdminEndpointsTests {
 
     private ClientAdminEndpointsValidator clientDetailsValidator = null;
 
+    private IdentityZone testZone = new IdentityZone();
+
     @Rule
     public ExpectedException expected = ExpectedException.none();
 
     private ResourceMonitor<ClientDetails> clientDetailsResourceMonitor;
-
-//    private ClientSecretValidator clientSecretValidator;
 
     private static abstract class NoOpClientDetailsResourceManager implements QueryableResourceManager<ClientDetails> {
         @Override
@@ -125,7 +125,6 @@ public class ClientAdminEndpointsTests {
         clientDetailsValidator.setClientDetailsService(clientDetailsService);
         clientDetailsValidator.setSecurityContextAccessor(securityContextAccessor);
 
-        IdentityZone testZone = new IdentityZone();
         testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,255,0,0,0,0,6));
         IdentityZoneHolder.set(testZone);
 
@@ -212,8 +211,6 @@ public class ClientAdminEndpointsTests {
         endpoints.deleteApprovals("someclient");
     }
 
-
-
     @Test
     public void testStatistics() throws Exception {
         assertEquals(0, endpoints.getClientDeletes());
@@ -225,6 +222,68 @@ public class ClientAdminEndpointsTests {
 
     @Test
     public void testCreateClientDetails() throws Exception {
+        when(clientDetailsService.retrieve(anyString())).thenReturn(input);
+        ClientDetails result = endpoints.createClientDetails(input);
+        assertNull(result.getClientSecret());
+        verify(clientDetailsService).create(detail);
+        assertEquals(1463510591, result.getAdditionalInformation().get("lastModified"));
+    }
+
+    @Test(expected = InvalidClientSecretException.class)
+    public void testCreateClientDetails_With_Secret_Length_Less_Than_MinLength() throws Exception {
+        testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(7,255,0,0,0,0,6));
+        IdentityZoneHolder.set(testZone);
+        when(clientDetailsService.retrieve(anyString())).thenReturn(input);
+        ClientDetails result = endpoints.createClientDetails(input);
+    }
+
+    @Test(expected = InvalidClientSecretException.class)
+    public void testCreateClientDetails_With_Secret_Length_Greater_Than_MaxLength() throws Exception {
+        testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,5,0,0,0,0,6));
+        IdentityZoneHolder.set(testZone);
+        when(clientDetailsService.retrieve(anyString())).thenReturn(input);
+        ClientDetails result = endpoints.createClientDetails(input);
+    }
+
+    @Test(expected = InvalidClientSecretException.class)
+    public void testCreateClientDetails_With_Secret_Require_Digit() throws Exception {
+        testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,5,0,0,1,0,6));
+        IdentityZoneHolder.set(testZone);
+        when(clientDetailsService.retrieve(anyString())).thenReturn(input);
+        ClientDetails result = endpoints.createClientDetails(input);
+    }
+
+    @Test(expected = InvalidClientSecretException.class)
+    public void testCreateClientDetails_With_Secret_Require_Uppercase() throws Exception {
+        testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,5,1,0,0,0,6));
+        IdentityZoneHolder.set(testZone);
+        when(clientDetailsService.retrieve(anyString())).thenReturn(input);
+        ClientDetails result = endpoints.createClientDetails(input);
+    }
+
+    @Test(expected = InvalidClientSecretException.class)
+    public void testCreateClientDetails_With_Secret_Require_Lowercase() throws Exception {
+        testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,5,0,1,0,0,6));
+        IdentityZoneHolder.set(testZone);
+        when(clientDetailsService.retrieve(anyString())).thenReturn(input);
+        ClientDetails result = endpoints.createClientDetails(input);
+    }
+
+    @Test(expected = InvalidClientSecretException.class)
+    public void testCreateClientDetails_With_Secret_Require_Special_Character() throws Exception {
+        testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,5,0,0,0,1,6));
+        IdentityZoneHolder.set(testZone);
+        when(clientDetailsService.retrieve(anyString())).thenReturn(input);
+        ClientDetails result = endpoints.createClientDetails(input);
+    }
+
+    @Test
+    public void testCreateClientDetails_With_Secret_Satisfying_Complex_Policy() throws Exception {
+        testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(6,255,1,1,1,1,6));
+        IdentityZoneHolder.set(testZone);
+        String complexPolicySatisfyingSecret = "Secret1@";
+        input.setClientSecret(complexPolicySatisfyingSecret);
+        detail.setClientSecret(complexPolicySatisfyingSecret);
         when(clientDetailsService.retrieve(anyString())).thenReturn(input);
         ClientDetails result = endpoints.createClientDetails(input);
         assertNull(result.getClientSecret());
@@ -945,5 +1004,4 @@ public class ClientAdminEndpointsTests {
         assertTrue(updated.isAutoApprove("foo.read"));
         assertTrue(updated.isAutoApprove("foo.write"));
     }
-
 }
