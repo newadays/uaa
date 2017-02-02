@@ -62,6 +62,8 @@ public class ClientBasicAuthenticationFilterMockMvcTests {
 
         testZone = new IdentityZone();
         testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,255,0,0,0,0,6));
+
+        IdentityZoneHolder.set(testZone);
     }
 
     @Test
@@ -83,8 +85,6 @@ public class ClientBasicAuthenticationFilterMockMvcTests {
         request.addHeader("Authorization", "Basic " + CREDENTIALS_HEADER_STRING);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        IdentityZoneHolder.set(testZone);
-
         filter.doFilter(request, response, chain);
 
         verify(clientAuthenticationManager).authenticate(any(Authentication.class));
@@ -103,8 +103,6 @@ public class ClientBasicAuthenticationFilterMockMvcTests {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Basic " + CREDENTIALS_HEADER_STRING);
         MockHttpServletResponse response = new MockHttpServletResponse();
-
-        IdentityZoneHolder.set(testZone);
 
         filter.doFilter(request, response, chain);
 

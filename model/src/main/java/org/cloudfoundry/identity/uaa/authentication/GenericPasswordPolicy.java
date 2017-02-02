@@ -16,7 +16,7 @@ import org.cloudfoundry.identity.uaa.provider.PasswordPolicy;
  * subcomponent's license, as noted in the LICENSE file.
  * *****************************************************************************
  */
-public class GenericPasswordPolicy {
+public abstract class GenericPasswordPolicy <T extends GenericPasswordPolicy<T>> {
 
     private int minLength;
     private int maxLength;
@@ -66,47 +66,47 @@ public class GenericPasswordPolicy {
         return requireDigit;
     }
 
-    public GenericPasswordPolicy setMaxLength(int maxLength) {
+    public T setMaxLength(int maxLength) {
         this.maxLength = maxLength;
-        return this;
+        return (T)this;
     }
 
-    public GenericPasswordPolicy setMinLength(int minLength) {
+    public T setMinLength(int minLength) {
         this.minLength = minLength;
-        return this;
+        return (T)this;
     }
 
-    public GenericPasswordPolicy setRequireDigit(int requireDigit) {
+    public T setRequireDigit(int requireDigit) {
         this.requireDigit = requireDigit;
-        return this;
+        return (T)this;
     }
 
-    public GenericPasswordPolicy setRequireLowerCaseCharacter(int requireLowerCaseCharacter) {
+    public T setRequireLowerCaseCharacter(int requireLowerCaseCharacter) {
         this.requireLowerCaseCharacter = requireLowerCaseCharacter;
-        return this;
+        return (T)this;
     }
 
-    public GenericPasswordPolicy setRequireUpperCaseCharacter(int requireUpperCaseCharacter) {
+    public T setRequireUpperCaseCharacter(int requireUpperCaseCharacter) {
         this.requireUpperCaseCharacter = requireUpperCaseCharacter;
-        return this;
+        return (T)this;
     }
 
     public int getRequireSpecialCharacter() {
         return requireSpecialCharacter;
     }
 
-    public GenericPasswordPolicy setRequireSpecialCharacter(int requireSpecialCharacter) {
+    public T setRequireSpecialCharacter(int requireSpecialCharacter) {
         this.requireSpecialCharacter = requireSpecialCharacter;
-        return this;
+        return (T)this;
     }
 
     public int getExpirePasswordInMonths() {
         return expirePasswordInMonths;
     }
 
-    public GenericPasswordPolicy setExpirePasswordInMonths(int expirePasswordInMonths) {
+    public T setExpirePasswordInMonths(int expirePasswordInMonths) {
         this.expirePasswordInMonths = expirePasswordInMonths;
-        return this;
+        return (T)this;
     }
 
     public boolean allPresentAndPositive() {

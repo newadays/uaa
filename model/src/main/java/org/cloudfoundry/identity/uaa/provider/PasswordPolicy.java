@@ -17,7 +17,7 @@ package org.cloudfoundry.identity.uaa.provider;
 
 import org.cloudfoundry.identity.uaa.authentication.GenericPasswordPolicy;
 
-public class PasswordPolicy extends GenericPasswordPolicy {
+public class PasswordPolicy extends GenericPasswordPolicy<PasswordPolicy> {
 
     public static final String PASSWORD_POLICY_FIELD = "passwordPolicy";
 

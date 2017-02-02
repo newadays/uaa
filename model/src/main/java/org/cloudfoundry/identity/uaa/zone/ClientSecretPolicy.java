@@ -16,7 +16,7 @@ import org.cloudfoundry.identity.uaa.authentication.GenericPasswordPolicy;
  * subcomponent's license, as noted in the LICENSE file.
  * *****************************************************************************
  */
-public class ClientSecretPolicy extends GenericPasswordPolicy {
+public class ClientSecretPolicy extends GenericPasswordPolicy<ClientSecretPolicy> {
     public static final String CLIENT_SECRET_POLICY_FIELD = "clientSecretPolicy";
 
     public ClientSecretPolicy() {

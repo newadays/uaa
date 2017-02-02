@@ -3,9 +3,12 @@ package org.cloudfoundry.identity.uaa.zone;
 
 import org.passay.*;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 
 /**
  *
@@ -36,6 +39,32 @@ import java.util.List;
  */
 public class ZoneClientSecretPolicyValidator implements ClientSecretValidator {
 
+    public static final String DEFAULT_MESSAGE_PATH = "/clientsecret-messages.properties";
+
+    private static PropertiesMessageResolver messageResolver;
+
+    static {
+            final Properties props = new Properties();
+            InputStream in = null;
+            try {
+                in = ZoneClientSecretPolicyValidator.class.getResourceAsStream(
+                        DEFAULT_MESSAGE_PATH);
+                props.load(in);
+                messageResolver = new PropertiesMessageResolver(props);
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                        "Error loading default message properties.",
+                        e);
+            } finally {
+                try {
+                    if (in != null) {
+                        in.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+    }
 
     private final ClientSecretPolicy globalDefaultClientSecretPolicy;
 
@@ -67,11 +96,9 @@ public class ZoneClientSecretPolicyValidator implements ClientSecretValidator {
                 throw new InvalidClientSecretException(errorMessages);
             }
         }
-
     }
 
-
-    public PasswordValidator getClientSecretValidator(ClientSecretPolicy policy) {
+    private static PasswordValidator getClientSecretValidator(ClientSecretPolicy policy) {
         List<Rule> rules = new ArrayList<>();
         if (policy.getMinLength()>=0 && policy.getMaxLength()>0) {
             rules.add(new LengthRule(policy.getMinLength(), policy.getMaxLength()));
@@ -88,6 +115,6 @@ public class ZoneClientSecretPolicyValidator implements ClientSecretValidator {
         if (policy.getRequireSpecialCharacter() > 0) {
             rules.add(new SpecialCharacterRule(policy.getRequireSpecialCharacter()));
         }
-        return new PasswordValidator(rules);
+        return new PasswordValidator(messageResolver, rules);
     }
 }

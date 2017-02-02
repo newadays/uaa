@@ -24,7 +24,7 @@ import org.cloudfoundry.identity.uaa.resources.SearchResults;
 import org.cloudfoundry.identity.uaa.resources.SimpleAttributeNameMapper;
 import org.cloudfoundry.identity.uaa.security.SecurityContextAccessor;
 import org.cloudfoundry.identity.uaa.security.StubSecurityContextAccessor;
-import org.cloudfoundry.identity.uaa.zone.ClientServicesExtension;
+import org.cloudfoundry.identity.uaa.zone.*;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -95,6 +95,8 @@ public class ClientAdminEndpointsTests {
 
     private ResourceMonitor<ClientDetails> clientDetailsResourceMonitor;
 
+//    private ClientSecretValidator clientSecretValidator;
+
     private static abstract class NoOpClientDetailsResourceManager implements QueryableResourceManager<ClientDetails> {
         @Override
         public ClientDetails create(ClientDetails resource) {
@@ -123,6 +125,10 @@ public class ClientAdminEndpointsTests {
         clientDetailsValidator.setClientDetailsService(clientDetailsService);
         clientDetailsValidator.setSecurityContextAccessor(securityContextAccessor);
 
+        IdentityZone testZone = new IdentityZone();
+        testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,255,0,0,0,0,6));
+        IdentityZoneHolder.set(testZone);
+
         endpoints.setClientDetailsService(clientDetailsService);
         endpoints.setClientRegistrationService(clientRegistrationService);
         endpoints.setSecurityContextAccessor(securityContextAccessor);
@@ -131,6 +137,7 @@ public class ClientAdminEndpointsTests {
         endpoints.setClientDetailsValidator(clientDetailsValidator);
         endpoints.setRestrictedScopesValidator(new RestrictUaaScopesClientValidator(new UaaScopes()));
         endpoints.setClientDetailsResourceMonitor(clientDetailsResourceMonitor);
+        endpoints.setClientSecretValidator(new ZoneClientSecretPolicyValidator(new ClientSecretPolicy(0,255,0,0,0,0,6)));
 
         Map<String, String> attributeNameMap = new HashMap<String, String>();
         attributeNameMap.put("client_id", "clientId");
