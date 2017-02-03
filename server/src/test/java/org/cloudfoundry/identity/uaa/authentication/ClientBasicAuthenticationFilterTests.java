@@ -32,7 +32,7 @@ import java.util.Map;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.*;
 
-public class ClientBasicAuthenticationFilterMockMvcTests {
+public class ClientBasicAuthenticationFilterTests {
     private ClientBasicAuthenticationFilter filter;
     private IdentityZone testZone;
 

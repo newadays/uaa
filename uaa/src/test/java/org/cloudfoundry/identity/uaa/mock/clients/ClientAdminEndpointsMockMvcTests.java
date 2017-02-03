@@ -40,13 +40,15 @@ import org.cloudfoundry.identity.uaa.scim.endpoints.ScimUserEndpoints;
 import org.cloudfoundry.identity.uaa.test.UaaTestAccounts;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
 import org.cloudfoundry.identity.uaa.util.PredicateMatcher;
+import org.cloudfoundry.identity.uaa.zone.ClientSecretPolicy;
+import org.cloudfoundry.identity.uaa.zone.IdentityZone;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -55,6 +57,7 @@ import org.springframework.security.oauth2.provider.ClientDetails;
 import org.springframework.security.oauth2.provider.client.BaseClientDetails;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.util.StringUtils;
 
@@ -69,14 +72,10 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED;
+import static org.mockito.Mockito.*;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -84,6 +83,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
+    public static final String SECRET = "secret";
     private String adminToken = null;
     private String adminUserToken = null;
     private ScimUserEndpoints scimUserEndpoints = null;
@@ -95,6 +95,9 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     private String testPassword;
     private RandomValueStringGenerator generator  = new RandomValueStringGenerator(7);
     private UaaTestAccounts testAccounts;
+    public static final String SECRET_TOO_LONG = "adfdfdasgdasgasdgafsgasfgfasgfadsgfagsagasddsafdsafsdfdafsdafdsfasdffasfasdfasdfdsfds" +
+            "ewrewrewqrweqrewqrewqrewerwqqweewqrdsadsfewqrewqrtewrewrewrewrererererererererererdfadsafasfdasfsdaf" +
+            "dsfasdfdsagfdsao43o4p43adfsfasdvcdasfmdsafzxcvaddsaaddfsafdsafdsfdsdfsfdsfdsasdfadfsadfsasadfsdfadfs";
 
     @Before
     public void createCaptor() throws Exception {
@@ -173,16 +176,26 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     @Test
     public void testCreateClient() throws Exception {
-        ClientDetails client = createClient(adminToken, new RandomValueStringGenerator().generate(), Collections.singleton("client_credentials"));
+        ClientDetails client = createClient(adminToken, new RandomValueStringGenerator().generate(),  SECRET,
+                Collections.singleton("client_credentials"), status().isCreated());
         verify(applicationEventPublisher, times(1)).publishEvent(captor.capture());
         assertEquals(AuditEventType.ClientCreateSuccess, captor.getValue().getAuditEvent().getType());
         assertEquals(makeClientName(client.getClientId()), client.getAdditionalInformation().get("name"));
     }
 
     @Test
+    public void testCreateClient_With_Long_Secret() throws Exception {
+        ClientDetails client = createClient(adminToken, new RandomValueStringGenerator().generate(), SECRET_TOO_LONG,
+                    Collections.singleton("client_credentials"), status().isBadRequest());
+        verifyNoMoreInteractions(applicationEventPublisher);
+    }
+
+
+    @Test
     public void testClientCRUDAsAdminUser() throws Exception {
         setupAdminUserToken();
-        ClientDetails client = createClient(adminUserToken, new RandomValueStringGenerator().generate(), Collections.singleton("client_credentials"));
+        ClientDetails client = createClient(adminUserToken, SECRET, new RandomValueStringGenerator().generate(),
+                                Collections.singleton("client_credentials"), status().isCreated());
         verify(applicationEventPublisher, times(2)).publishEvent(captor.capture());
         for (AbstractUaaEvent event : captor.getAllValues()) {
             assertEquals(AuditEventType.ClientCreateSuccess, event.getAuditEvent().getType());
@@ -228,7 +241,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
                     "clients.admin");
             List<String> authorities = Arrays.asList("password.write", "scim.write", "scim.read");
             List<String> scopes = Arrays.asList("foo","bar","oauth.approvals");
-            ClientDetailsModification client = createBaseClient(clientId, Collections.singleton("client_credentials"), authorities, scopes);
+            ClientDetailsModification client = createBaseClient(clientId, SECRET, Collections.singleton("client_credentials"), authorities, scopes);
             MockHttpServletRequestBuilder createClientPost = post("/oauth/clients")
                     .header("Authorization", "Bearer " + clientAdminToken)
                     .accept(APPLICATION_JSON)
@@ -256,8 +269,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     public void testCreate_RestrictedClient_Fails() throws Exception {
         String id = new RandomValueStringGenerator().generate();
         List<String> grantTypes = Arrays.asList("client_credentials", "password");
-        BaseClientDetails clientWithAuthorities = createBaseClient(id, grantTypes, new UaaScopes().getUaaScopes(), null);
-        BaseClientDetails clientWithScopes = createBaseClient(id, grantTypes, null, new UaaScopes().getUaaScopes());
+        BaseClientDetails clientWithAuthorities = createBaseClient(id, SECRET, grantTypes, new UaaScopes().getUaaScopes(), null);
+        BaseClientDetails clientWithScopes = createBaseClient(id, SECRET, grantTypes, null, new UaaScopes().getUaaScopes());
 
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients/restricted")
             .header("Authorization", "Bearer " + adminToken)
@@ -278,7 +291,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     public void testCreate_RestrictedClient_Succeeds() throws Exception {
         String id = new RandomValueStringGenerator().generate();
         List<String> scopes = Collections.singletonList("openid");
-        BaseClientDetails client = createBaseClient(id, Arrays.asList("client_credentials", "password"), scopes, scopes);
+        BaseClientDetails client = createBaseClient(id, SECRET, Arrays.asList("client_credentials", "password"), scopes, scopes);
 
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients/restricted")
             .header("Authorization", "Bearer " + adminToken)
@@ -304,9 +317,23 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     }
 
     @Test
+    public void testCreateClientsTxFailure_Secret_Too_Long() throws Exception {
+        int count = 5;
+        BaseClientDetails[] details = createBaseClients(count, SECRET_TOO_LONG, null);
+        MockHttpServletRequestBuilder createClientPost = post("/oauth/clients/tx")
+                .header("Authorization", "Bearer " + adminToken)
+                .accept(APPLICATION_JSON)
+                .contentType(APPLICATION_JSON)
+                .content(toString(details));
+        ResultActions result = getMockMvc().perform(createClientPost);
+        result.andExpect(status().isBadRequest());
+        verifyNoMoreInteractions(applicationEventPublisher);
+    }
+
+    @Test
     public void testCreateClientsTxSuccess() throws Exception {
         int count = 5;
-        BaseClientDetails[] details = createBaseClients(count, null);
+        BaseClientDetails[] details = createBaseClients(count, SECRET, null);
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients/tx")
                 .header("Authorization", "Bearer " + adminToken)
                 .accept(APPLICATION_JSON)
@@ -328,7 +355,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     @Test
     public void testCreateClientsTxDuplicateId() throws Exception {
-        BaseClientDetails[] details = createBaseClients(5, null);
+        BaseClientDetails[] details = createBaseClients(5, SECRET, null);
         details[details.length-1] = details[0];
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients/tx")
                 .header("Authorization", "Bearer " + adminToken)
@@ -343,13 +370,112 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     }
 
     @Test
+    public void test_InZone_ClientWrite_Failure_with_Min_Length_Secret() throws Exception {
+        String subdomain = generator.generate();
+        MockMvcUtils.IdentityZoneCreationResult result = MockMvcUtils.utils().createOtherIdentityZoneAndReturnResult(subdomain, getMockMvc(), getWebApplicationContext(), null);
+        result.getIdentityZone().getConfig().setClientSecretPolicy(new ClientSecretPolicy(7,255,0,0,0,0,6));
+        MockMvcUtils.setZoneConfiguration(getWebApplicationContext(), result.getIdentityZone().getId(), result.getIdentityZone().getConfig());
+
+        String clientId = generator.generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "openid","authorization_code","");
+        client.setClientSecret("secret");
+        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), client, result.getIdentityZone(),
+                status().isBadRequest());
+    }
+
+    @Test
+    public void test_InZone_ClientWrite_Failure_with_Secret_Too_Long() throws Exception {
+        String subdomain = generator.generate();
+        MockMvcUtils.IdentityZoneCreationResult result = MockMvcUtils.utils().createOtherIdentityZoneAndReturnResult(subdomain, getMockMvc(), getWebApplicationContext(), null);
+        result.getIdentityZone().getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,5,0,0,0,0,6));
+        MockMvcUtils.setZoneConfiguration(getWebApplicationContext(), result.getIdentityZone().getId(), result.getIdentityZone().getConfig());
+
+        String clientId = generator.generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "openid","authorization_code","");
+        client.setClientSecret("secret");
+        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), client, result.getIdentityZone(),
+                status().isBadRequest());
+    }
+
+    @Test
+    public void test_InZone_ClientWrite_Failure_with_Secret_Requires_Uppercase_Character() throws Exception {
+        String subdomain = generator.generate();
+        MockMvcUtils.IdentityZoneCreationResult result = MockMvcUtils.utils().createOtherIdentityZoneAndReturnResult(subdomain, getMockMvc(), getWebApplicationContext(), null);
+        result.getIdentityZone().getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,255,1,0,0,0,6));
+        MockMvcUtils.setZoneConfiguration(getWebApplicationContext(), result.getIdentityZone().getId(), result.getIdentityZone().getConfig());
+
+        String clientId = generator.generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "openid","authorization_code","");
+        client.setClientSecret("secret");
+        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), client, result.getIdentityZone(),
+                status().isBadRequest());
+    }
+
+    @Test
+    public void test_InZone_ClientWrite_Failure_with_Secret_Requires_Lowercase_Character() throws Exception {
+        String subdomain = generator.generate();
+        MockMvcUtils.IdentityZoneCreationResult result = MockMvcUtils.utils().createOtherIdentityZoneAndReturnResult(subdomain, getMockMvc(), getWebApplicationContext(), null);
+        result.getIdentityZone().getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,255,0,1,0,0,6));
+        MockMvcUtils.setZoneConfiguration(getWebApplicationContext(), result.getIdentityZone().getId(), result.getIdentityZone().getConfig());
+
+        String clientId = generator.generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "openid","authorization_code","");
+        client.setClientSecret("SECRET");
+        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), client, result.getIdentityZone(),
+                status().isBadRequest());
+    }
+
+    @Test
+    public void test_InZone_ClientWrite_Success_with_Complex_Secret_Policy() throws Exception {
+        String subdomain = generator.generate();
+        MockMvcUtils.IdentityZoneCreationResult result = MockMvcUtils.utils().createOtherIdentityZoneAndReturnResult(subdomain, getMockMvc(), getWebApplicationContext(), null);
+        result.getIdentityZone().getConfig().setClientSecretPolicy(new ClientSecretPolicy(6,255,1,1,1,1,6));
+        MockMvcUtils.setZoneConfiguration(getWebApplicationContext(), result.getIdentityZone().getId(), result.getIdentityZone().getConfig());
+
+        String clientId = generator.generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "openid","authorization_code","");
+        client.setClientSecret("Secret1@");
+        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), client, result.getIdentityZone(),
+                status().isCreated());
+    }
+
+    @Test
+    public void test_InZone_ClientWrite_Failure_with_Secret_Requires_Special_Character() throws Exception {
+        String subdomain = generator.generate();
+        MockMvcUtils.IdentityZoneCreationResult result = MockMvcUtils.utils().createOtherIdentityZoneAndReturnResult(subdomain, getMockMvc(), getWebApplicationContext(), null);
+        result.getIdentityZone().getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,255,0,0,0,1,6));
+        MockMvcUtils.setZoneConfiguration(getWebApplicationContext(), result.getIdentityZone().getId(), result.getIdentityZone().getConfig());
+
+        String clientId = generator.generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "openid","authorization_code","");
+        client.setClientSecret("secret");
+        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), client, result.getIdentityZone(),
+                status().isBadRequest());
+    }
+
+    @Test
+    public void test_InZone_ClientWrite_Failure_with_Secret_Requires_Digit() throws Exception {
+        String subdomain = generator.generate();
+        MockMvcUtils.IdentityZoneCreationResult result = MockMvcUtils.utils().createOtherIdentityZoneAndReturnResult(subdomain, getMockMvc(), getWebApplicationContext(), null);
+        result.getIdentityZone().getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,255,0,0,1,0,6));
+        MockMvcUtils.setZoneConfiguration(getWebApplicationContext(), result.getIdentityZone().getId(), result.getIdentityZone().getConfig());
+
+        String clientId = generator.generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "openid","authorization_code","");
+        client.setClientSecret("secret");
+        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), client, result.getIdentityZone(),
+                status().isBadRequest());
+    }
+
+    @Test
     public void test_InZone_ClientWrite_Using_ZonesDotAdmin() throws Exception {
         String subdomain = generator.generate();
         MockMvcUtils.IdentityZoneCreationResult result = MockMvcUtils.utils().createOtherIdentityZoneAndReturnResult(subdomain, getMockMvc(), getWebApplicationContext(), null);
         String clientId = generator.generate();
         BaseClientDetails client = new BaseClientDetails(clientId, "", "openid","authorization_code","");
         client.setClientSecret("secret");
-        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), client, result.getIdentityZone());
+        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), client, result.getIdentityZone(),
+                                        status().isCreated());
     }
 
     @Test
@@ -367,7 +493,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
         BaseClientDetails newclient = new BaseClientDetails(clientId, "", "openid","authorization_code","");
         newclient.setClientSecret("secret");
-        newclient = MockMvcUtils.utils().createClient(getMockMvc(), zonesClientsAdminToken, newclient, result.getIdentityZone());
+        newclient = MockMvcUtils.utils().createClient(getMockMvc(), zonesClientsAdminToken, newclient,
+                                                result.getIdentityZone(), status().isCreated());
 
         MockMvcUtils.utils().updateClient(getMockMvc(), zonesClientsAdminToken, newclient, result.getIdentityZone());
     }
@@ -383,7 +510,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
         BaseClientDetails client = new BaseClientDetails(clientId, "", "openid","authorization_code","");
         client.setClientSecret("secret");
-        BaseClientDetails createdClient = MockMvcUtils.utils().createClient(getMockMvc(), adminUserToken, client, result.getIdentityZone());
+        BaseClientDetails createdClient = MockMvcUtils.utils().createClient(getMockMvc(), adminUserToken, client,
+                                result.getIdentityZone(), status().isCreated());
 
         assertEquals(client.getClientId(), createdClient.getClientId());
 
@@ -434,7 +562,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
         BaseClientDetails newclient = new BaseClientDetails(clientId, "", "openid","authorization_code","");
         newclient.setClientSecret("secret");
-        MockMvcUtils.utils().createClient(getMockMvc(), zonesClientsAdminToken, newclient, result.getIdentityZone());
+        MockMvcUtils.utils().createClient(getMockMvc(), zonesClientsAdminToken, newclient,
+                                result.getIdentityZone(), status().isCreated());
     }
 
     @Test
@@ -452,14 +581,15 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
         BaseClientDetails newclient = new BaseClientDetails(clientId, "", "openid","authorization_code","");
         newclient.setClientSecret("secret");
-        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), newclient, result.getIdentityZone());
+        MockMvcUtils.utils().createClient(getMockMvc(), result.getZoneAdminToken(), newclient,
+                        result.getIdentityZone(), status().isCreated());
 
         MockMvcUtils.utils().getClient(getMockMvc(), zonesClientsReadToken, newclient.getClientId(), result.getIdentityZone());
     }
 
     @Test
     public void testCreateClientsTxClientCredentialsWithoutSecret() throws Exception {
-        BaseClientDetails[] details = createBaseClients(5, null);
+        BaseClientDetails[] details = createBaseClients(5, null, null);
         details[details.length-1].setAuthorizedGrantTypes(StringUtils.commaDelimitedListToSet("client_credentials"));
         details[details.length-1].setClientSecret(null);
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients/tx")
@@ -479,7 +609,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         int count = 5;
         BaseClientDetails[] details = new BaseClientDetails[count];
         for (int i=0; i<details.length; i++) {
-            details[i] = (BaseClientDetails)createClient(adminToken,null,null);
+            details[i] = (BaseClientDetails)createClient(adminToken,null,SECRET,null, status().isCreated());
             details[i].setRefreshTokenValiditySeconds(120);
         }
         MockHttpServletRequestBuilder updateClientPut = put("/oauth/clients/tx")
@@ -512,7 +642,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         int count = 5;
         BaseClientDetails[] details = new BaseClientDetails[count];
         for (int i=0; i<details.length; i++) {
-            details[i] = (BaseClientDetails)createClient(adminToken,null,null);
+            details[i] = (BaseClientDetails)createClient(adminToken,null,SECRET,null, status().isCreated());
             details[i].setRefreshTokenValiditySeconds(120);
         }
         String firstId = details[0].getClientId();
@@ -541,7 +671,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         int count = 5;
         BaseClientDetails[] details = new BaseClientDetails[count];
         for (int i=0; i<details.length; i++) {
-            details[i] = (BaseClientDetails)createClient(adminToken,null,null);
+            details[i] = (BaseClientDetails)createClient(adminToken,null,SECRET,null,status().isCreated());
         }
         MockHttpServletRequestBuilder deleteClientsPost = post("/oauth/clients/tx/delete")
                 .header("Authorization", "Bearer " + adminToken)
@@ -571,7 +701,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         int count = 5;
         BaseClientDetails[] details = new BaseClientDetails[count];
         for (int i=0; i<details.length; i++) {
-            details[i] = (BaseClientDetails)createClient(adminToken,null,null);
+            details[i] = (BaseClientDetails)createClient(adminToken,null,SECRET,null,status().isCreated());
         }
         String firstId = details[0].getClientId();
         details[0].setClientId("unknown.client.id");
@@ -598,16 +728,16 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         int count = 5;
         ClientDetailsModification[] details = new ClientDetailsModification[count*3];
         for (int i=0; i<count; i++) {
-            details[i] = (ClientDetailsModification)createClient(adminToken,null,null);
+            details[i] = (ClientDetailsModification)createClient(adminToken,null, SECRET,null, status().isCreated());
             details[i].setRefreshTokenValiditySeconds(120);
             details[i].setAction(ClientDetailsModification.UPDATE);
         }
         for (int i=count; i<(count*2); i++) {
-            details[i] = (ClientDetailsModification)createClient(adminToken,null,null);
+            details[i] = (ClientDetailsModification)createClient(adminToken,null,SECRET,null, status().isCreated());
             details[i].setAction(ClientDetailsModification.DELETE);
         }
         for (int i=(count*2); i<(count*3); i++) {
-            details[i] = createBaseClient(null,null);
+            details[i] = createBaseClient(null,SECRET,null);
             details[i].setAction(ClientDetailsModification.ADD);
         }
 
@@ -672,16 +802,18 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     public void testAddUpdateDeleteClientsTxDeleteFailedRollback() throws Exception {
         ClientDetailsModification[] details = new ClientDetailsModification[15];
         for (int i=0; i<5; i++) {
-            details[i] = (ClientDetailsModification)createClient(adminToken,null,Collections.singleton("password"));
+            details[i] = (ClientDetailsModification)createClient(adminToken,null,SECRET,
+                                                                    Collections.singleton("password"),
+                                                                        status().isCreated());
             details[i].setRefreshTokenValiditySeconds(120);
             details[i].setAction(ClientDetailsModification.UPDATE);
         }
         for (int i=5; i<10; i++) {
-            details[i] = (ClientDetailsModification)createClient(adminToken,null,null);
+            details[i] = (ClientDetailsModification)createClient(adminToken,null,SECRET,null, status().isCreated());
             details[i].setAction(ClientDetailsModification.DELETE);
         }
         for (int i=10; i<15; i++) {
-            details[i] = createBaseClient(null,null);
+            details[i] = createBaseClient(null,null,null);
             details[i].setAction(ClientDetailsModification.ADD);
         }
 
@@ -728,7 +860,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     @Test
     public void testApprovalsAreDeleted() throws Exception {
-        ClientDetails details = createClient(adminToken, new RandomValueStringGenerator().generate(), Collections.singleton("password"));
+        ClientDetails details = createClient(adminToken, new RandomValueStringGenerator().generate(),
+                                    SECRET, Collections.singleton("password"), status().isCreated());
         String userToken = testClient.getUserOAuthAccessToken(
                 details.getClientId(),
                 "secret",
@@ -769,7 +902,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     @Test
     public void testApprovalsAreDeleted2() throws Exception {
-        ClientDetails details = createClient(adminToken, new RandomValueStringGenerator().generate(), Collections.singleton("password"));
+        ClientDetails details = createClient(adminToken, new RandomValueStringGenerator().generate(),
+                                        SECRET, Collections.singleton("password"),status().isCreated());
         String userToken = testClient.getUserOAuthAccessToken(
                             details.getClientId(),
                             "secret",
@@ -802,7 +936,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     @Test
     public void testModifyApprovalsAreDeleted() throws Exception {
-        ClientDetails details = createClient(adminToken, new RandomValueStringGenerator().generate(), Collections.singleton("password"));
+        ClientDetails details = createClient(adminToken, new RandomValueStringGenerator().generate(),
+                        SECRET, Collections.singleton("password"), status().isCreated());
         ((ClientDetailsModification)details).setAction(ClientDetailsModification.DELETE);
         String userToken = testClient.getUserOAuthAccessToken(
             details.getClientId(),
@@ -842,7 +977,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     public void testSecretChangeTxApprovalsNotDeleted() throws Exception {
         int count = 3;
         //create clients
-        ClientDetailsModification[] clients = createBaseClients(count, Arrays.asList("client_credentials", "password"));
+        ClientDetailsModification[] clients = createBaseClients(count, SECRET, Arrays.asList("client_credentials", "password"));
         for (ClientDetailsModification c : clients) {
             c.setAction(c.ADD);
         }
@@ -917,7 +1052,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
                 testAccounts.getAdminClientSecret(),
                 "uaa.admin,clients.secret");
         String id = "secretchangeevent";
-        ClientDetails c = createClient(token, id, Collections.singleton("client_credentials"));
+        ClientDetails c = createClient(token, id, SECRET, Collections.singleton("client_credentials"),
+                                    status().isCreated());
         SecretChangeRequest request = new SecretChangeRequest(id, "secret", "newsecret");
         MockHttpServletRequestBuilder modifyClientsPost = put("/oauth/clients/" + id + "/secret")
             .header("Authorization", "Bearer " + token)
@@ -939,7 +1075,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
             testAccounts.getAdminClientSecret(),
             "uaa.admin,clients.secret");
         String id = generator.generate();
-        ClientDetails client = createClient(token, id, Collections.singleton("client_credentials"));
+        ClientDetails client = createClient(token, id, SECRET, Collections.singleton("client_credentials"),
+                                                                                                    status().isCreated());
         SecretChangeRequest request = new SecretChangeRequest();
         request.setSecret("password2");
         request.setChangeMode(ADD);
@@ -968,7 +1105,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
             testAccounts.getAdminClientSecret(),
             "uaa.admin,clients.secret");
         String id = generator.generate();
-        ClientDetails client = createClient(token, id, Collections.singleton("client_credentials"));
+        ClientDetails client = createClient(token, id, SECRET, Collections.singleton("client_credentials"),
+                                                                                        status().isCreated());
         SecretChangeRequest request = new SecretChangeRequest();
         request.setSecret("password2");
         request.setChangeMode(ADD);
@@ -1004,7 +1142,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
             testAccounts.getAdminClientSecret(),
             "uaa.admin,clients.secret");
         String id = generator.generate();
-        ClientDetails client = createClient(token, id, Collections.singleton("client_credentials"));
+        ClientDetails client = createClient(token, id, SECRET, Collections.singleton("client_credentials"),
+                                            status().isCreated());
         SecretChangeRequest request = new SecretChangeRequest();
         request.setSecret("password2");
         request.setChangeMode(ADD);
@@ -1043,7 +1182,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
             testAccounts.getAdminClientSecret(),
             "uaa.admin,clients.secret");
         String id = generator.generate();
-        ClientDetails client = createClient(token, id, Collections.singleton("client_credentials"));
+        ClientDetails client = createClient(token, id, SECRET, Collections.singleton("client_credentials"),
+                status().isCreated());
 
         SecretChangeRequest request = new SecretChangeRequest();
         request.setChangeMode(DELETE);
@@ -1072,7 +1212,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
                 testAccounts.getAdminClientSecret(),
                 "uaa.admin");
         String id = generator.generate();
-        BaseClientDetails c = (BaseClientDetails) createClient(adminToken, id, Collections.singleton("client_credentials"));
+        BaseClientDetails c = (BaseClientDetails) createClient(adminToken, id,
+                                    SECRET, Collections.singleton("client_credentials"), status().isCreated());
         SecretChangeRequest request = new SecretChangeRequest(id, null, "newsecret");
 
         MockHttpServletRequestBuilder modifySecret = put("/oauth/clients/" + id + "/secret")
@@ -1091,7 +1232,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
           testAccounts.getAdminClientSecret(),
           "clients.admin");
         String id = generator.generate();
-        BaseClientDetails c = (BaseClientDetails) createClient(adminToken, id, Collections.singleton("client_credentials"));
+        BaseClientDetails c = (BaseClientDetails) createClient(adminToken, id,
+                                SECRET, Collections.singleton("client_credentials"), status().isCreated());
         SecretChangeRequest request = new SecretChangeRequest(id, null, "newersecret");
 
         MockHttpServletRequestBuilder modifySecret = put("/oauth/clients/" + id + "/secret")
@@ -1107,7 +1249,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     public void testFailedSecretChangeEvent() throws Exception {
 
         List<String> scopes = Arrays.asList("oauth.approvals","clients.secret");
-        BaseClientDetails client = createBaseClient(null, Arrays.asList("password", "client_credentials"), scopes, scopes);
+        BaseClientDetails client = createBaseClient(null, SECRET, Arrays.asList("password", "client_credentials"), scopes, scopes);
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients")
             .header("Authorization", "Bearer " + adminToken)
             .accept(APPLICATION_JSON)
@@ -1135,7 +1277,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     public void testSecretChangeModifyTxApprovalsDeleted() throws Exception {
         int count = 3;
         //create clients
-        ClientDetailsModification[] clients = createBaseClients(count, Arrays.asList("client_credentials","password"));
+        ClientDetailsModification[] clients = createBaseClients(count, SECRET, Arrays.asList("client_credentials","password"));
         for (ClientDetailsModification c : clients) {
             c.setAction(c.ADD);
         }
@@ -1222,7 +1364,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
     @Test
     public void testSecretChangeModifyTxApprovalsNotDeleted() throws Exception {
         //create clients
-        ClientDetailsModification[] clients = createBaseClients(3, Arrays.asList("client_credentials","password"));
+        ClientDetailsModification[] clients = createBaseClients(3, SECRET, Arrays.asList("client_credentials","password"));
         for (ClientDetailsModification c : clients) {
             c.setAction(c.ADD);
         }
@@ -1291,7 +1433,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         ClientDetails adminsClient = createClientAdminsClient(adminToken);
 
         //create clients
-        ClientDetailsModification[] clients = createBaseClients(3, Arrays.asList("client_credentials","refresh_token"));
+        ClientDetailsModification[] clients = createBaseClients(3, SECRET, Arrays.asList("client_credentials","refresh_token"));
         for (ClientDetailsModification c : clients) {
             c.setScope(Collections.singletonList("oauth.approvals"));
             c.setAction(c.ADD);
@@ -1316,7 +1458,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         ClientDetails adminsClient = createReadWriteClient(adminToken);
 
         //create clients
-        ClientDetailsModification[] clients = createBaseClients(3, Arrays.asList("client_credentials","refresh_token"));
+        ClientDetailsModification[] clients = createBaseClients(3, SECRET, Arrays.asList("client_credentials","refresh_token"));
         for (ClientDetailsModification c : clients) {
             c.setScope(Collections.singletonList("oauth.approvals"));
             c.setAction(c.ADD);
@@ -1342,7 +1484,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         ClientDetails adminsClient = createClientAdminsClient(adminToken);
 
         //create clients
-        ClientDetailsModification[] clients = createBaseClients(1, Arrays.asList("client_credentials","refresh_token"));
+        ClientDetailsModification[] clients = createBaseClients(1, SECRET, Arrays.asList("client_credentials","refresh_token"));
         for (ClientDetailsModification c : clients) {
             c.setScope(Collections.singletonList("oauth.approvals"));
             c.setAction(c.ADD);
@@ -1367,7 +1509,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         ClientDetails adminsClient = createReadWriteClient(adminToken);
 
         //create clients
-        ClientDetailsModification[] clients = createBaseClients(1, Arrays.asList("client_credentials","refresh_token"));
+        ClientDetailsModification[] clients = createBaseClients(1, SECRET, Arrays.asList("client_credentials","refresh_token"));
         for (ClientDetailsModification c : clients) {
             c.setScope(Collections.singletonList("oauth.approvals"));
             c.setAction(c.ADD);
@@ -1392,7 +1534,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         ClientDetails adminsClient = createReadWriteClient(adminToken);
 
         //create clients
-        ClientDetailsModification[] clients = createBaseClients(1, Arrays.asList("client_credentials", "refresh_token"));
+        ClientDetailsModification[] clients = createBaseClients(1, SECRET, Arrays.asList("client_credentials", "refresh_token"));
         for (ClientDetailsModification c : clients) {
             c.setScope(Collections.singletonList("oauth.approvals"));
             c.setAction(c.ADD);
@@ -1455,14 +1597,17 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     @Test
     public void testClientWithDotInID() throws Exception {
-        ClientDetails details = createClient(adminToken, "testclient", Collections.singleton("client_credentials"));
-        ClientDetails detailsv2 = createClient(adminToken, "testclient.v2", Collections.singleton("client_credentials"));
+        ClientDetails details = createClient(adminToken, "testclient", SECRET,
+                                                    Collections.singleton("client_credentials"), status().isCreated());
+        ClientDetails detailsv2 = createClient(adminToken, "testclient.v2", SECRET,
+                            Collections.singleton("client_credentials"), status().isCreated());
         assertEquals("testclient.v2", detailsv2.getClientId());
     }
 
     @Test
     public void testPutClientModifyAuthorities() throws Exception {
-        ClientDetails client = createClient(adminToken, "testClientForModifyAuthorities", Collections.singleton("client_credentials"));
+        ClientDetails client = createClient(adminToken, "testClientForModifyAuthorities",
+                            SECRET, Collections.singleton("client_credentials"), status().isCreated());
 
         BaseClientDetails modified = new BaseClientDetails(client);
         modified.setAuthorities(Collections.singleton((GrantedAuthority) () -> "newAuthority"));
@@ -1482,7 +1627,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     @Test
     public void testPutClientModifyAccessTokenValidity() throws Exception {
-        ClientDetails client = createClient(adminToken, "testClientForModifyAccessTokenValidity", Collections.singleton("client_credentials"));
+        ClientDetails client = createClient(adminToken, "testClientForModifyAccessTokenValidity",
+                                    SECRET, Collections.singleton("client_credentials"), status().isCreated());
 
         BaseClientDetails modified = new BaseClientDetails(client);
         modified.setAccessTokenValiditySeconds(73);
@@ -1500,7 +1646,8 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     @Test
     public void testPutClientModifyName() throws Exception {
-        ClientDetails client = createClient(adminToken, "testClientForModifyName", Collections.singleton("client_credentials"));
+        ClientDetails client = createClient(adminToken, "testClientForModifyName",
+                                SECRET, Collections.singleton("client_credentials"), status().isCreated());
 
         Map<String, Object> requestBody = JsonUtils.readValue(JsonUtils.writeValueAsString(new BaseClientDetails(client)), new TypeReference<Map<String, Object>>() {});
         requestBody.put("name", "New Client Name");
@@ -1569,14 +1716,17 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         return approvals;
     }
 
-    private ClientDetails createClient(String token, String id, Collection<String> grantTypes) throws Exception {
-        BaseClientDetails client = createBaseClient(id,grantTypes);
+    private ClientDetails createClient(String token,
+                                       String id, String clientSecret,
+                                       Collection<String> grantTypes,
+                                       ResultMatcher status) throws Exception {
+        BaseClientDetails client = createBaseClient(id,clientSecret,grantTypes);
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients")
                 .header("Authorization", "Bearer " + token)
                 .accept(APPLICATION_JSON)
                 .contentType(APPLICATION_JSON)
                 .content(toString(client));
-        getMockMvc().perform(createClientPost).andExpect(status().isCreated());
+        getMockMvc().perform(createClientPost).andExpect(status);
         return getClient(client.getClientId());
     }
 
@@ -1608,7 +1758,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     private ClientDetails createClientAdminsClient(String token) throws Exception {
         List<String> scopes = Arrays.asList("oauth.approvals", "clients.admin");
-        BaseClientDetails client = createBaseClient(null, Arrays.asList("password", "client_credentials"), scopes, scopes);
+        BaseClientDetails client = createBaseClient(null, SECRET, Arrays.asList("password", "client_credentials"), scopes, scopes);
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients")
                 .header("Authorization", "Bearer " + token)
                 .accept(APPLICATION_JSON)
@@ -1620,7 +1770,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     private ClientDetails createReadWriteClient(String token) throws Exception {
         List<String> scopes = Arrays.asList("oauth.approvals","clients.read","clients.write");
-        BaseClientDetails client = createBaseClient(null, Arrays.asList("password","client_credentials"), scopes, scopes);
+        BaseClientDetails client = createBaseClient(null, SECRET, Arrays.asList("password","client_credentials"), scopes, scopes);
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients")
                 .header("Authorization", "Bearer " + token)
                 .accept(APPLICATION_JSON)
@@ -1632,7 +1782,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     private ClientDetails createAdminClient(String token) throws Exception {
         List<String> scopes = Arrays.asList("uaa.admin","oauth.approvals","clients.read","clients.write");
-        BaseClientDetails client = createBaseClient(null, Arrays.asList("password","client_credentials"), scopes, scopes);
+        BaseClientDetails client = createBaseClient(null, SECRET, Arrays.asList("password","client_credentials"), scopes, scopes);
 
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients")
                 .header("Authorization", "Bearer " + token)
@@ -1645,7 +1795,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
     private ClientDetails createApprovalsLoginClient(String token) throws Exception {
         List<String> scopes = Arrays.asList("uaa.admin","oauth.approvals","oauth.login");
-        BaseClientDetails client = createBaseClient(null, Arrays.asList("password","client_credentials"), scopes, scopes);
+        BaseClientDetails client = createBaseClient(null, SECRET, Arrays.asList("password","client_credentials"), scopes, scopes);
 
         MockHttpServletRequestBuilder createClientPost = post("/oauth/clients")
                 .header("Authorization", "Bearer " + token)
@@ -1659,11 +1809,11 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
 
 
 
-    private ClientDetailsModification createBaseClient(String id, Collection<String> grantTypes) {
-        return createBaseClient(id, grantTypes, Collections.singletonList("uaa.none"), Arrays.asList("foo", "bar", "oauth.approvals"));
+    private ClientDetailsModification createBaseClient(String id, String clientSecret, Collection<String> grantTypes) {
+        return createBaseClient(id, clientSecret, grantTypes, Collections.singletonList("uaa.none"), Arrays.asList("foo", "bar", "oauth.approvals"));
     }
 
-    private ClientDetailsModification createBaseClient(String id, Collection<String> grantTypes, List<String> authorities, List<String> scopes) {
+    private ClientDetailsModification createBaseClient(String id, String clientSecret, Collection<String> grantTypes, List<String> authorities, List<String> scopes) {
         if (id==null) {
             id = new RandomValueStringGenerator().generate();
         }
@@ -1677,7 +1827,7 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         if(authorities != null) {
             client.setAuthorities(AuthorityUtils.commaSeparatedStringToAuthorityList(String.join(",", authorities)));
         }
-        client.setClientSecret("secret");
+        client.setClientSecret(clientSecret);
         Map<String, Object> additionalInformation = new HashMap<>();
         additionalInformation.put("foo", "bar");
         additionalInformation.put("name", makeClientName(id));
@@ -1685,10 +1835,10 @@ public class ClientAdminEndpointsMockMvcTests extends InjectedMockContextTest {
         return client;
     }
 
-    private ClientDetailsModification[] createBaseClients(int length, Collection<String> grantTypes) {
+    private ClientDetailsModification[] createBaseClients(int length, String clientSecret, Collection<String> grantTypes) {
         ClientDetailsModification[] result = new ClientDetailsModification[length];
         for (int i=0; i<result.length; i++) {
-            result[i] = createBaseClient(null, grantTypes);
+            result[i] = createBaseClient(null, clientSecret, grantTypes);
         }
         return result;
     }
