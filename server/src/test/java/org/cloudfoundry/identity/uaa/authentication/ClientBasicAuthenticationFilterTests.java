@@ -26,6 +26,7 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -71,7 +72,10 @@ public class ClientBasicAuthenticationFilterTests {
         BaseClientDetails clientDetails = new BaseClientDetails("client-1", "none", "uaa.none", "client_credentials",
                 "http://localhost:5000/uaadb" );
 
-        clientDetails.setAdditionalInformation(createTestAdditionalInformation("01/01/2017"));
+        Calendar previousDay = Calendar.getInstance();
+        previousDay.roll(Calendar.DATE, -1);
+
+        clientDetails.setAdditionalInformation(createTestAdditionalInformation(previousDay));
 
         when(clientDetailsService.loadClientByClientId(anyString())).thenReturn(clientDetails);
 
@@ -95,7 +99,10 @@ public class ClientBasicAuthenticationFilterTests {
         BaseClientDetails clientDetails = new BaseClientDetails("client-1", "none", "uaa.none", "client_credentials",
                                "http://localhost:5000/uaadb" );
 
-        clientDetails.setAdditionalInformation(createTestAdditionalInformation("01/01/2016"));
+
+        Calendar expiredDate = Calendar.getInstance();
+        expiredDate.set(2016, 1, 1);
+        clientDetails.setAdditionalInformation(createTestAdditionalInformation(expiredDate));
 
         when(clientDetailsService.loadClientByClientId(Mockito.anyString())).thenReturn(clientDetails);
 
@@ -110,10 +117,10 @@ public class ClientBasicAuthenticationFilterTests {
         verifyNoMoreInteractions(chain);
     }
 
-    private Map<String, Object> createTestAdditionalInformation(String dateStr) throws ParseException{
+    private Map<String, Object> createTestAdditionalInformation(Calendar calendar) throws ParseException{
         Map<String,Object> additionalInformation = new HashMap<String,Object>();
         additionalInformation.put(ClientConstants.LAST_MODIFIED,
-                new Timestamp(new SimpleDateFormat("MM/dd/yyyy").parse(dateStr).getTime()));
+                new Timestamp(calendar.getTimeInMillis()));
 
         return additionalInformation;
     }

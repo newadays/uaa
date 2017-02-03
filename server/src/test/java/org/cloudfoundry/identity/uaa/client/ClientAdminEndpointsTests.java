@@ -739,6 +739,27 @@ public class ClientAdminEndpointsTests {
 
     }
 
+
+    @Test(expected = InvalidClientSecretException.class)
+    public void testChangeSecretDeniedTooLong() throws Exception {
+        testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,5,0,0,0,0,6));
+        String complexPolicySatisfyingSecret = "Secret1@";
+
+        when(clientDetailsService.retrieve(detail.getClientId())).thenReturn(detail);
+
+        SecurityContextAccessor sca = mock(SecurityContextAccessor.class);
+        when(sca.getClientId()).thenReturn("admin");
+        when(sca.isClient()).thenReturn(true);
+        when(sca.isAdmin()).thenReturn(true);
+        setSecurityContextAccessor(sca);
+
+        SecretChangeRequest change = new SecretChangeRequest();
+        change.setOldSecret(detail.getClientSecret());
+        change.setSecret(complexPolicySatisfyingSecret);
+        endpoints.changeSecret(detail.getClientId(), change);
+    }
+
+
     @Test
     public void testRemoveClientDetailsAdminCaller() throws Exception {
         Mockito.when(securityContextAccessor.isAdmin()).thenReturn(true);

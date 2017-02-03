@@ -44,26 +44,26 @@ public class ZoneClientSecretPolicyValidator implements ClientSecretValidator {
     private static PropertiesMessageResolver messageResolver;
 
     static {
-            final Properties props = new Properties();
-            InputStream in = null;
+        final Properties props = new Properties();
+        InputStream in = null;
+        try {
+            in = ZoneClientSecretPolicyValidator.class.getResourceAsStream(
+                    DEFAULT_MESSAGE_PATH);
+            props.load(in);
+            messageResolver = new PropertiesMessageResolver(props);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Error loading default message properties.",
+                    e);
+        } finally {
             try {
-                in = ZoneClientSecretPolicyValidator.class.getResourceAsStream(
-                        DEFAULT_MESSAGE_PATH);
-                props.load(in);
-                messageResolver = new PropertiesMessageResolver(props);
-            } catch (Exception e) {
-                throw new IllegalStateException(
-                        "Error loading default message properties.",
-                        e);
-            } finally {
-                try {
-                    if (in != null) {
-                        in.close();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
+                if (in != null) {
+                    in.close();
                 }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
+        }
     }
 
     private final ClientSecretPolicy globalDefaultClientSecretPolicy;
