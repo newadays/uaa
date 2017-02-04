@@ -7,6 +7,7 @@ import org.cloudfoundry.identity.uaa.zone.ClientSecretPolicy;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -67,6 +68,11 @@ public class ClientBasicAuthenticationFilterTests {
         IdentityZoneHolder.set(testZone);
     }
 
+    @After
+    public void tearDown() {
+        IdentityZoneHolder.clear();
+    }
+
     @Test
     public void doesContinueWithFilterChain_IfClientSecretNotExpired() throws IOException, ServletException, ParseException {
         BaseClientDetails clientDetails = new BaseClientDetails("client-1", "none", "uaa.none", "client_credentials",
@@ -77,7 +83,7 @@ public class ClientBasicAuthenticationFilterTests {
 
         clientDetails.setAdditionalInformation(createTestAdditionalInformation(previousDay));
 
-        when(clientDetailsService.loadClientByClientId(anyString())).thenReturn(clientDetails);
+        when(clientDetailsService.loadClientByClientId(Mockito.matches("app"))).thenReturn(clientDetails);
 
         UsernamePasswordAuthentication authResult =
                 new UsernamePasswordAuthentication("app","appclientsecret");
@@ -104,7 +110,7 @@ public class ClientBasicAuthenticationFilterTests {
         expiredDate.set(2016, 1, 1);
         clientDetails.setAdditionalInformation(createTestAdditionalInformation(expiredDate));
 
-        when(clientDetailsService.loadClientByClientId(Mockito.anyString())).thenReturn(clientDetails);
+        when(clientDetailsService.loadClientByClientId(Mockito.matches("app"))).thenReturn(clientDetails);
 
         MockFilterChain chain = mock(MockFilterChain.class);
         MockHttpServletRequest request = new MockHttpServletRequest();
