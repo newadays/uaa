@@ -37,7 +37,7 @@ import java.util.Properties;
  *                  Number of months after which current secret expires (defaults to 0).
  *
  */
-public class ZoneClientSecretPolicyValidator implements ClientSecretValidator {
+public class ZoneAwareClientSecretPolicyValidator implements ClientSecretValidator {
 
     public static final String DEFAULT_MESSAGE_PATH = "/clientsecret-messages.properties";
 
@@ -47,7 +47,7 @@ public class ZoneClientSecretPolicyValidator implements ClientSecretValidator {
         final Properties props = new Properties();
         InputStream in = null;
         try {
-            in = ZoneClientSecretPolicyValidator.class.getResourceAsStream(
+            in = ZoneAwareClientSecretPolicyValidator.class.getResourceAsStream(
                     DEFAULT_MESSAGE_PATH);
             props.load(in);
             messageResolver = new PropertiesMessageResolver(props);
@@ -68,7 +68,7 @@ public class ZoneClientSecretPolicyValidator implements ClientSecretValidator {
 
     private final ClientSecretPolicy globalDefaultClientSecretPolicy;
 
-    public ZoneClientSecretPolicyValidator(ClientSecretPolicy globalDefaultClientSecretPolicy) {
+    public ZoneAwareClientSecretPolicyValidator(ClientSecretPolicy globalDefaultClientSecretPolicy) {
         this.globalDefaultClientSecretPolicy = globalDefaultClientSecretPolicy;
     }
 

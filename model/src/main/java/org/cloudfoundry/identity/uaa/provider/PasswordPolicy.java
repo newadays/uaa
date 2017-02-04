@@ -21,8 +21,11 @@ public class PasswordPolicy extends GenericPasswordPolicy<PasswordPolicy> {
 
     public static final String PASSWORD_POLICY_FIELD = "passwordPolicy";
 
+    private int expirePasswordInMonths;
+
     public PasswordPolicy() {
         super();
+        this.expirePasswordInMonths = -1;
     }
 
     public PasswordPolicy(int minLength,
@@ -31,15 +34,46 @@ public class PasswordPolicy extends GenericPasswordPolicy<PasswordPolicy> {
                           int requireLowerCaseCharacter,
                           int requireDigit,
                           int requireSpecialCharacter,
-                          int expirePasswordsInMonths) {
+                          int expirePasswordInMonths) {
         super(minLength,
                 maxLength,
                 requireUpperCaseCharacter,
                 requireLowerCaseCharacter,
                 requireDigit,
-                requireSpecialCharacter,
-                expirePasswordsInMonths);
+                requireSpecialCharacter);
+        this.expirePasswordInMonths = expirePasswordInMonths;
     }
 
+    public int getExpirePasswordInMonths() {
+        return expirePasswordInMonths;
+    }
 
+    public PasswordPolicy setExpirePasswordInMonths(int expirePasswordInMonths) {
+        this.expirePasswordInMonths = expirePasswordInMonths;
+        return this;
+    }
+
+    @Override
+    public boolean allPresentAndPositive() {
+        return super.allPresentAndPositive() && expirePasswordInMonths >= 0;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+
+        PasswordPolicy that = (PasswordPolicy) o;
+
+        return expirePasswordInMonths == that.expirePasswordInMonths;
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = super.hashCode();
+        result = 31 * result + expirePasswordInMonths;
+        return result;
+    }
 }

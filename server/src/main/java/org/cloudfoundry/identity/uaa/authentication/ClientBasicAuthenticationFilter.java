@@ -29,6 +29,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.codec.Base64;
 import org.springframework.security.oauth2.provider.ClientDetailsService;
+import org.springframework.security.oauth2.provider.ClientRegistrationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 
@@ -75,7 +76,7 @@ public class ClientBasicAuthenticationFilter extends BasicAuthenticationFilter {
             Timestamp lastModified = (Timestamp) clientDetailsService.loadClientByClientId(clientId).getAdditionalInformation().get(ClientConstants.LAST_MODIFIED);
 
             int expiringPassword = IdentityZoneHolder.get().getConfig().
-                        getClientSecretPolicy().getExpirePasswordInMonths();
+                        getClientSecretPolicy().getExpireSecretInMonths();
             if (expiringPassword>0) {
                 Calendar cal = Calendar.getInstance();
                 cal.setTimeInMillis(lastModified.getTime());
@@ -87,6 +88,8 @@ public class ClientBasicAuthenticationFilter extends BasicAuthenticationFilter {
         } catch(BadCredentialsException e) {
             super.getAuthenticationEntryPoint().commence(request, response, e);
             return;
+        } catch(ClientRegistrationException e) {
+            logger.debug(e.getMessage());
         }
         //call parent class to authenticate
         super.doFilterInternal(request, response, chain);

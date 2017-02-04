@@ -24,10 +24,9 @@ public abstract class GenericPasswordPolicy <T extends GenericPasswordPolicy<T>>
     private int requireLowerCaseCharacter;
     private int requireDigit;
     private int requireSpecialCharacter;
-    private int expirePasswordInMonths;
 
     public GenericPasswordPolicy() {
-        minLength = maxLength = requireUpperCaseCharacter = requireLowerCaseCharacter = requireDigit = requireSpecialCharacter = expirePasswordInMonths = -1;
+        minLength = maxLength = requireUpperCaseCharacter = requireLowerCaseCharacter = requireDigit = requireSpecialCharacter = -1;
     }
 
     public GenericPasswordPolicy(int minLength,
@@ -35,15 +34,13 @@ public abstract class GenericPasswordPolicy <T extends GenericPasswordPolicy<T>>
                           int requireUpperCaseCharacter,
                           int requireLowerCaseCharacter,
                           int requireDigit,
-                          int requireSpecialCharacter,
-                          int expirePasswordsInMonths) {
+                          int requireSpecialCharacter) {
         this.minLength = minLength;
         this.maxLength = maxLength;
         this.requireUpperCaseCharacter = requireUpperCaseCharacter;
         this.requireLowerCaseCharacter = requireLowerCaseCharacter;
         this.requireDigit = requireDigit;
         this.requireSpecialCharacter = requireSpecialCharacter;
-        this.expirePasswordInMonths = expirePasswordsInMonths;
     }
 
     public int getMinLength() {
@@ -100,17 +97,8 @@ public abstract class GenericPasswordPolicy <T extends GenericPasswordPolicy<T>>
         return (T)this;
     }
 
-    public int getExpirePasswordInMonths() {
-        return expirePasswordInMonths;
-    }
-
-    public T setExpirePasswordInMonths(int expirePasswordInMonths) {
-        this.expirePasswordInMonths = expirePasswordInMonths;
-        return (T)this;
-    }
-
     public boolean allPresentAndPositive() {
-        return minLength >= 0 && maxLength >= 0 && requireUpperCaseCharacter >= 0 && requireLowerCaseCharacter >= 0 && requireDigit >= 0 && requireSpecialCharacter >= 0 && expirePasswordInMonths >= 0;
+        return minLength >= 0 && maxLength >= 0 && requireUpperCaseCharacter >= 0 && requireLowerCaseCharacter >= 0 && requireDigit >= 0 && requireSpecialCharacter >= 0;
     }
 
     @Override
@@ -126,8 +114,7 @@ public abstract class GenericPasswordPolicy <T extends GenericPasswordPolicy<T>>
         if (getRequireLowerCaseCharacter() != that.getRequireLowerCaseCharacter()) return false;
         if (getRequireDigit() != that.getRequireDigit()) return false;
         if (getRequireSpecialCharacter() != that.getRequireSpecialCharacter()) return false;
-        return getExpirePasswordInMonths() == that.getExpirePasswordInMonths();
-
+        return true;
     }
 
     @Override
@@ -138,7 +125,6 @@ public abstract class GenericPasswordPolicy <T extends GenericPasswordPolicy<T>>
         result = 31 * result + getRequireLowerCaseCharacter();
         result = 31 * result + getRequireDigit();
         result = 31 * result + getRequireSpecialCharacter();
-        result = 31 * result + getExpirePasswordInMonths();
         return result;
     }
 }

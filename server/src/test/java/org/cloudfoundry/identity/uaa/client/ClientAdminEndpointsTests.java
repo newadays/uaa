@@ -124,6 +124,8 @@ public class ClientAdminEndpointsTests {
         clientDetailsValidator = new ClientAdminEndpointsValidator();
         clientDetailsValidator.setClientDetailsService(clientDetailsService);
         clientDetailsValidator.setSecurityContextAccessor(securityContextAccessor);
+        clientDetailsValidator.setClientSecretValidator(
+                new ZoneAwareClientSecretPolicyValidator(new ClientSecretPolicy(0,255,0,0,0,0,6)));
 
         testZone.getConfig().setClientSecretPolicy(new ClientSecretPolicy(0,255,0,0,0,0,6));
         IdentityZoneHolder.set(testZone);
@@ -136,7 +138,6 @@ public class ClientAdminEndpointsTests {
         endpoints.setClientDetailsValidator(clientDetailsValidator);
         endpoints.setRestrictedScopesValidator(new RestrictUaaScopesClientValidator(new UaaScopes()));
         endpoints.setClientDetailsResourceMonitor(clientDetailsResourceMonitor);
-        endpoints.setClientSecretValidator(new ZoneClientSecretPolicyValidator(new ClientSecretPolicy(0,255,0,0,0,0,6)));
 
         Map<String, String> attributeNameMap = new HashMap<String, String>();
         attributeNameMap.put("client_id", "clientId");

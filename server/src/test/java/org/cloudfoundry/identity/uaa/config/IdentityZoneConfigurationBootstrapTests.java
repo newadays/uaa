@@ -79,7 +79,7 @@ public class IdentityZoneConfigurationBootstrapTests extends JdbcTestBase {
         assertEquals(1, uaa.getConfig().getClientSecretPolicy().getRequireLowerCaseCharacter());
         assertEquals(1, uaa.getConfig().getClientSecretPolicy().getRequireDigit());
         assertEquals(1, uaa.getConfig().getClientSecretPolicy().getRequireSpecialCharacter());
-        assertEquals(6, uaa.getConfig().getClientSecretPolicy().getExpirePasswordInMonths());
+        assertEquals(6, uaa.getConfig().getClientSecretPolicy().getExpireSecretInMonths());
     }
 
     @Test

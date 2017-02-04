@@ -4,9 +4,9 @@ package org.cloudfoundry.identity.uaa.zone;
 import org.junit.Before;
 import org.junit.Test;
 
-public class ZoneClientSecretPolicyValidatorTests {
+public class ZoneAwareClientSecretPolicyValidatorTests {
 
-    private ZoneClientSecretPolicyValidator validator;
+    private ZoneAwareClientSecretPolicyValidator validator;
 
     private IdentityZone zone;
 
@@ -29,7 +29,7 @@ public class ZoneClientSecretPolicyValidatorTests {
     public void setUp() {
         zone = new IdentityZone();
         IdentityZoneHolder.set(zone);
-        validator = new ZoneClientSecretPolicyValidator(defaultPolicy);
+        validator = new ZoneAwareClientSecretPolicyValidator(defaultPolicy);
     }
 
     @Test(expected=InvalidClientSecretException.class)

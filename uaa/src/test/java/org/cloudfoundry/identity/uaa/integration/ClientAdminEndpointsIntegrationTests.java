@@ -139,14 +139,29 @@ public class ClientAdminEndpointsIntegrationTests {
     }
 
     @Test
-    public void nonImplicitGrantClientWithoutSecretIsRejected() throws Exception {
+    public void createClientWithoutSecretIsRejected() throws Exception {
+        OAuth2AccessToken token = getClientCredentialsAccessToken("clients.read,clients.write");
+        HttpHeaders headers = getAuthenticatedHeaders(token);
+        BaseClientDetails invalidSecretClient = new BaseClientDetails(new RandomValueStringGenerator().generate(), "", "foo,bar",
+                        "client_credentials", "uaa.none");
+        invalidSecretClient.setClientSecret("tooLongSecret");
+        ResponseEntity<UaaException> result = serverRunning.getRestTemplate().exchange(
+                        serverRunning.getUrl("/oauth/clients"), HttpMethod.POST,
+                        new HttpEntity<BaseClientDetails>(invalidSecretClient, headers), UaaException.class);
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+        assertEquals("invalid_client", result.getBody().getErrorCode());
+    }
+
+
+    @Test
+    public void createClientWithTooLongSecretIsRejected() throws Exception {
         OAuth2AccessToken token = getClientCredentialsAccessToken("clients.read,clients.write");
         HttpHeaders headers = getAuthenticatedHeaders(token);
         BaseClientDetails client = new BaseClientDetails(new RandomValueStringGenerator().generate(), "", "foo,bar",
-                        "client_credentials", "uaa.none");
+                "client_credentials", "uaa.none");
         ResponseEntity<UaaException> result = serverRunning.getRestTemplate().exchange(
-                        serverRunning.getUrl("/oauth/clients"), HttpMethod.POST,
-                        new HttpEntity<BaseClientDetails>(client, headers), UaaException.class);
+                serverRunning.getUrl("/oauth/clients"), HttpMethod.POST,
+                new HttpEntity<BaseClientDetails>(client, headers), UaaException.class);
         assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
         assertEquals("invalid_client", result.getBody().getErrorCode());
     }
@@ -350,6 +365,7 @@ public class ClientAdminEndpointsIntegrationTests {
         }
     }
 
+    //TODO
     @Test
     public void testChangeSecret() throws Exception {
         headers = getAuthenticatedHeaders(getClientCredentialsAccessToken("clients.read,clients.write,clients.secret,uaa.admin"));
@@ -575,13 +591,17 @@ public class ClientAdminEndpointsIntegrationTests {
     }
 
     private ClientDetailsModification createClient(String... grantTypes) throws Exception {
+        return createClientWithSecret("secret", grantTypes);
+    }
+
+    private ClientDetailsModification createClientWithSecret(String secret, String... grantTypes) throws Exception {
         ClientDetailsModification detailsModification = new ClientDetailsModification();
         detailsModification.setClientId(new RandomValueStringGenerator().generate());
         detailsModification.setScope(Arrays.asList("oauth.approvals", "foo", "bar"));
         detailsModification.setAuthorizedGrantTypes(Arrays.asList(grantTypes));
         detailsModification.setAuthorities(AuthorityUtils.commaSeparatedStringToAuthorityList("uaa.none"));
         ClientDetailsModification client = detailsModification;
-        client.setClientSecret("secret");
+        client.setClientSecret(secret);
         client.setAdditionalInformation(Collections.<String, Object>singletonMap("foo", Arrays.asList("bar")));
         ResponseEntity<Void> result = serverRunning.getRestTemplate().exchange(serverRunning.getUrl("/oauth/clients"),
                         HttpMethod.POST, new HttpEntity<BaseClientDetails>(client, headers), Void.class);

@@ -119,8 +119,6 @@ public class ClientAdminEndpoints implements InitializingBean {
 
     private AuthenticationManager authenticationManager;
 
-    private ClientSecretValidator clientSecretValidator;
-
     public ClientDetailsValidator getRestrictedScopesValidator() {
         return restrictedScopesValidator;
     }
@@ -217,7 +215,6 @@ public class ClientAdminEndpoints implements InitializingBean {
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody
     public ClientDetails createClientDetails(@RequestBody BaseClientDetails client) throws Exception {
-        clientSecretValidator.validate(client.getClientSecret());
         ClientDetails details = clientDetailsValidator.validate(client, Mode.CREATE);
         return removeSecret(clientDetailsService.create(details));
     }
@@ -238,7 +235,6 @@ public class ClientAdminEndpoints implements InitializingBean {
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody
     public ClientDetails createRestrictedClientDetails(@RequestBody BaseClientDetails client) throws Exception {
-        clientSecretValidator.validate(client.getClientSecret());
         getRestrictedScopesValidator().validate(client, Mode.CREATE);
         return createClientDetails(client);
     }
@@ -253,7 +249,6 @@ public class ClientAdminEndpoints implements InitializingBean {
         }
         ClientDetails[] results = new ClientDetails[clients.length];
         for (int i=0; i<clients.length; i++) {
-            clientSecretValidator.validate(clients[i].getClientSecret());
             results[i] = clientDetailsValidator.validate(clients[i], Mode.CREATE);
         }
         return doInsertClientDetails(results);
@@ -422,7 +417,7 @@ public class ClientAdminEndpoints implements InitializingBean {
                 clientId = change[i].getClientId();
                 clientDetails[i] = new ClientDetailsModification(clientDetailsService.retrieve(clientId));
                 boolean oldPasswordOk = authenticateClient(clientId, change[i].getOldSecret());
-                clientSecretValidator.validate(change[i].getSecret());
+                clientDetailsValidator.getClientSecretValidator().validate(change[i].getSecret());
                 clientRegistrationService.updateClientSecret(clientId, change[i].getSecret());
                 if (!oldPasswordOk) {
                     deleteApprovals(clientId);
@@ -529,7 +524,7 @@ public class ClientAdminEndpoints implements InitializingBean {
                     throw new InvalidClientDetailsException("client secret is either empty or client already has two secrets.");
                 }
 
-                clientSecretValidator.validate(change.getSecret());
+                clientDetailsValidator.getClientSecretValidator().validate(change.getSecret());
                 clientRegistrationService.addClientSecret(client_id, change.getSecret());
                 result = new ActionResult("ok", "Secret is added");
                 break;
@@ -544,7 +539,7 @@ public class ClientAdminEndpoints implements InitializingBean {
                 break;
 
             default:
-                clientSecretValidator.validate(change.getSecret());
+                clientDetailsValidator.getClientSecretValidator().validate(change.getSecret());
                 clientRegistrationService.updateClientSecret(client_id, change.getSecret());
                 result = new ActionResult("ok", "secret updated");
         }
@@ -733,14 +728,6 @@ public class ClientAdminEndpoints implements InitializingBean {
 
     public void setClientDetailsResourceMonitor(ResourceMonitor<ClientDetails> clientDetailsResourceMonitor) {
         this.clientDetailsResourceMonitor = clientDetailsResourceMonitor;
-    }
-
-    public ClientSecretValidator getClientSecretValidator() {
-        return clientSecretValidator;
-    }
-
-    public void setClientSecretValidator(ClientSecretValidator clientSecretValidator) {
-        this.clientSecretValidator = clientSecretValidator;
     }
 
 }
